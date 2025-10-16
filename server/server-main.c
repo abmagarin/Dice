@@ -5,12 +5,9 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include "server.h"
 #include <sys/select.h>
 #include <errno.h>
-
-#define PORT 1865
-#define MAX_CLIENTS 20
-#define BUFFER_SIZE 200
 
 int main()
 {
@@ -80,6 +77,7 @@ int main()
             }
 
             printf("Nuevo cliente conectado: %s\n", inet_ntoa(client_addr.sin_addr));
+            registerClient(new_socket);
 
             for (int i = 0; i < MAX_CLIENTS; i++)
             {
@@ -109,6 +107,49 @@ int main()
                 {
                     buffer[bytes_read] = '\0';
                     printf("Mensaje recibido: %s\n", buffer);
+
+                    char command[20];
+                    char parameter[50];
+
+                    switch (checkOption(buffer, client_sockets[i]))
+                    {
+                    case 1: // USUARIO
+                        sscanf(buffer, "%s %s", command, parameter);
+                        if (checkUser(parameter, client_sockets[i]))
+                        {
+                            addUser(client_sockets[i], parameter);
+                            char msg[] = "Usuario correcto, introduce la contraseña\n";
+                            send(client_sockets[i], msg, strlen(msg), 0);
+                        }
+                        else
+                        {
+                            char msg[] = "Usuario incorrecto.\n";
+                            send(client_sockets[i], msg, strlen(msg), 0);
+                        }
+                        printClients();
+                        break;
+
+                    case 2: // PASSWORD
+                        sscanf(buffer, "%s %s", command, parameter);
+                        if (addPassword(client_sockets[i], parameter))
+                        {
+                            char msg[] = "Contrasña correcta, ha iniciado sesión\n";
+                            send(client_sockets[i], msg, strlen(msg), 0);
+                        }
+                        else
+                        {
+                            char msg[] = "Contrasña incorrecta y usuario no coinciden\n";
+                            send(client_sockets[i], msg, strlen(msg), 0);
+                        }
+                        printClients();
+                        break;
+
+                    default:
+                        printf("Opción no reconocida: %s\n", buffer);
+                        char msg[] = "Comando no reconocido.\n";
+                        send(client_sockets[i], msg, strlen(msg), 0);
+                        break;
+                    }
                 }
             }
         }
