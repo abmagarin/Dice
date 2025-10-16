@@ -16,12 +16,8 @@ struct User users[100] = {
 // Struct de clientes conectados
 struct Client clients[MAX_CLIENTS];
 
-int checkOption(char *buffer, int descriptor)
+int checkOption(char *command, int descriptor)
 {
-    char command[20];
-    char parameter[50];
-
-    sscanf(buffer, "%s", command);
 
     if (strcmp(command, "USUARIO") == 0)
     {
@@ -31,13 +27,18 @@ int checkOption(char *buffer, int descriptor)
     {
         return 2;
     }
+    else if (strcmp(command, "REGISTRO") == 0)
+    {
+        return 3;
+    }
     else
     {
         return -1;
     }
 }
+
 // Comprueba que haya algún usuario con ese nombre
-int checkUser(char *parameter, int descriptor)
+int readUser(char *parameter, int descriptor)
 {
     for (int i = 0; i < 100; i++)
     {
@@ -115,7 +116,7 @@ int unregisterClient(int socket)
 }
 
 // Asigna el nombre user con el socket
-int addUser(int socket, char *user)
+int writeUser(int socket, char *user)
 {
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
@@ -171,4 +172,19 @@ void printClients()
         }
     }
     printf("=== Fin de la lista ===\n\n");
+}
+
+int addUser(char *username, char *password)
+{
+    for (int i = 0; i < 100; i++)
+    {
+        if (strcmp(users[i].usuario, "") == 0)
+        {
+            strcpy(users[i].usuario, username);
+            strcpy(users[i].contraseña, password);
+            printf("Usuario %s añadido.\n", username);
+            return 1;
+        }
+    }
+    return 0;
 }

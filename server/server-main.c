@@ -110,14 +110,15 @@ int main()
 
                     char command[20];
                     char parameter[50];
+                    char parameter2[50];
+                    sscanf(buffer, "%s %s", command, parameter);
 
-                    switch (checkOption(buffer, client_sockets[i]))
+                    switch (checkOption(command, client_sockets[i]))
                     {
                     case 1: // USUARIO
-                        sscanf(buffer, "%s %s", command, parameter);
-                        if (checkUser(parameter, client_sockets[i]))
+                        if (readUser(parameter, client_sockets[i]))
                         {
-                            addUser(client_sockets[i], parameter);
+                            writeUser(client_sockets[i], parameter);
                             char msg[] = "Usuario correcto, introduce la contraseña\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
                         }
@@ -130,7 +131,6 @@ int main()
                         break;
 
                     case 2: // PASSWORD
-                        sscanf(buffer, "%s %s", command, parameter);
                         if (addPassword(client_sockets[i], parameter))
                         {
                             char msg[] = "Contrasña correcta, ha iniciado sesión\n";
@@ -144,6 +144,33 @@ int main()
                         printClients();
                         break;
 
+                    case 3: // REGISTRO
+                        char option1[50];
+                        char option2[50];
+
+                        sscanf(buffer, "%s %s %s %s %s", command, option1, parameter, option2, parameter2);
+
+                        if (strcmp(option1, "-u") == 1 || strcmp(option2, "-p") == 1)
+                        {
+                            char msg[] = "El formato correcto es: REGISTRO –u usuario –p password\n";
+                            send(client_sockets[i], msg, strlen(msg), 0);
+                        }
+                        else
+                        {
+                            if (readUser(parameter, client_sockets[i]) == 0)
+                            {
+                                addUser(parameter, parameter2);
+                                char msg[] = "Usuario registrado correctamente, ya puede iniciar sesión\n";
+                                send(client_sockets[i], msg, strlen(msg), 0);
+                            }
+                            else
+                            {
+                                char msg[] = "El usuario ya existe.\n";
+                                send(client_sockets[i], msg, strlen(msg), 0);
+                            }
+                        }
+
+                        break;
                     default:
                         printf("Opción no reconocida: %s\n", buffer);
                         char msg[] = "Comando no reconocido.\n";

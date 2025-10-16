@@ -27,7 +27,7 @@ struct Client
 
 int checkOption(char *buffer, int descriptor);
 
-int checkUser(char *parameter, int socket);
+int readUser(char *parameter, int socket);
 
 int checkClientSocket(int socket);
 int checkClientUser(char *username);
@@ -40,6 +40,7 @@ int findUser(char *usuario, char *password);
 int addPassword(int socket, char *password);
 
 void printClients();
-int addUser(int socket, char *user);
+int writeUser(int socket, char *user);
+int addUser(char *username, char *password);
 
 #endif
