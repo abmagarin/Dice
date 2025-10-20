@@ -16,20 +16,26 @@ struct User users[100] = {
 // Struct de clientes conectados
 struct Client clients[MAX_CLIENTS];
 
+struct Partida partidas[MAX_PARTIDAS];
+
 int checkOption(char *command, int descriptor)
 {
 
-    if (strcmp(command, "USUARIO") == 0)
+    if ((strcmp(command, "USUARIO") == 0) && (checkClientRegistered(descriptor) == 0))
     {
         return 1;
     }
-    else if (strcmp(command, "PASSWORD") == 0)
+    else if ((strcmp(command, "PASSWORD") == 0) && (checkClientRegistered(descriptor) == 0))
     {
         return 2;
     }
-    else if (strcmp(command, "REGISTRO") == 0)
+    else if ((strcmp(command, "REGISTRO") == 0) && (checkClientRegistered(descriptor) == 0))
     {
         return 3;
+    }
+    else if ((strcmp(command, "INICIAR-PARTIDA") == 0) && (checkClientRegistered(descriptor) == 1))
+    {
+        return 4;
     }
     else
     {
@@ -132,6 +138,9 @@ int writeUser(int socket, char *user)
 // Comprueba que exista un usuario con las características dadas
 int findUser(char *usuario, char *password)
 {
+    if (usuario == NULL || password == NULL || strlen(password) == 0)
+        return 0;
+
     for (int i = 0; i < 100; i++)
     {
         if ((strcmp(users[i].usuario, usuario) == 0) && (strcmp(users[i].contraseña, password) == 0))
@@ -187,4 +196,49 @@ int addUser(char *username, char *password)
         }
     }
     return 0;
+}
+
+int checkClientRegistered(int socket)
+{
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients[i].socket == socket)
+        {
+            return clients[i].registered;
+        }
+    }
+    return 0;
+}
+
+int addPlayerToGame(int playerSocket)
+{
+    for (int i = 0; i < MAX_PARTIDAS; i++)
+    {
+        if (partidas[i].estado == 0)
+        {
+            partidas[i].jugadores[0] = playerSocket;
+            partidas[i].estado = 1;
+            return 1;
+        }
+        else if (partidas[i].estado == 1)
+        {
+            partidas[i].jugadores[1] = playerSocket;
+            partidas[i].estado = 2;
+            partidas[i].puntuacionMax = numeroAleatorio(90, 150);
+            char msg[100];
+            sprintf(msg, "+Ok. Empieza la partida. NÚMERO OBJETIVO: [%d]\n", partidas[i].puntuacionMax);
+
+            send(partidas[i].jugadores[1], msg, strlen(msg), 0);
+            send(partidas[i].jugadores[0], msg, strlen(msg), 0);
+
+            printf("PARTIDA INICIADA \n\n");
+            return 2;
+        }
+    }
+    return 0;
+}
+
+int numeroAleatorio(int min, int max)
+{
+    return rand() % (max - min + 1) + min;
 }

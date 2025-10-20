@@ -1,3 +1,4 @@
+#include "server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,15 +6,16 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include "server.h"
-#include <sys/select.h>
+#include <netinet/in.h>
 #include <errno.h>
+#include <time.h>
 
 int main()
 {
     int server_socket, new_socket, client_sockets[MAX_CLIENTS] = {0};
     struct sockaddr_in server_addr, client_addr;
     socklen_t addr_len = sizeof(client_addr);
+    srand(time(NULL));
 
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket < 0)
@@ -76,7 +78,6 @@ int main()
                 continue;
             }
 
-            printf("Nuevo cliente conectado: %s\n", inet_ntoa(client_addr.sin_addr));
             registerClient(new_socket);
 
             for (int i = 0; i < MAX_CLIENTS; i++)
@@ -108,9 +109,9 @@ int main()
                     buffer[bytes_read] = '\0';
                     printf("Mensaje recibido: %s\n", buffer);
 
-                    char command[20];
-                    char parameter[50];
-                    char parameter2[50];
+                    char command[20] = "";
+                    char parameter[50] = "";
+                    char parameter2[50] = "";
                     sscanf(buffer, "%s %s", command, parameter);
 
                     switch (checkOption(command, client_sockets[i]))
@@ -133,7 +134,7 @@ int main()
                     case 2: // PASSWORD
                         if (addPassword(client_sockets[i], parameter))
                         {
-                            char msg[] = "Contrasña correcta, ha iniciado sesión\n";
+                            char msg[] = "Contrasña correcta, ha iniciado sesión\n\n\n\n\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
                         }
                         else
@@ -150,7 +151,7 @@ int main()
 
                         sscanf(buffer, "%s %s %s %s %s", command, option1, parameter, option2, parameter2);
 
-                        if (strcmp(option1, "-u") == 1 || strcmp(option2, "-p") == 1)
+                        if (strcmp(option1, "-u") == 0 || strcmp(option2, "-p") == 0)
                         {
                             char msg[] = "El formato correcto es: REGISTRO –u usuario –p password\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
@@ -171,6 +172,30 @@ int main()
                         }
 
                         break;
+                    case 4: // INICIAR-PARTIDA
+                    {
+                        switch (addPlayerToGame(client_sockets[i]))
+                        {
+                        case 0:
+                        {
+                            char msg[] = "Ha ocurrido un error de emparejamiento\n";
+                            send(client_sockets[i], msg, strlen(msg), 0);
+                            break;
+                        }
+                        case 1:
+                        {
+                            char msg[] = "Esperando a otro jugador...\n";
+                            send(client_sockets[i], msg, strlen(msg), 0);
+                            break;
+                        }
+                        // Si hay dos jugadores comienza la partida desde la función addPlayerToGame
+                        default:
+                        {
+                            break;
+                        }
+                        }
+                    }
+                    break;
                     default:
                         printf("Opción no reconocida: %s\n", buffer);
                         char msg[] = "Comando no reconocido.\n";

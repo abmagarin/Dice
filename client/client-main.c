@@ -49,7 +49,22 @@ int main()
         if (bytes_received > 0)
         {
             buffer[bytes_received] = '\0';
-            printf("Respuesta del servidor: %s\n", buffer);
+            printf("[SERVER]: %s\n", buffer);
+
+            if (strncmp(buffer, "Esperando", 9) == 0)
+            {
+                while (1)
+                {
+                    bytes_received = recv(sock, buffer, sizeof(buffer) - 1, 0);
+                    if (bytes_received > 0)
+                    {
+                        buffer[bytes_received] = '\0';
+                        printf("[SERVER]: %s\n", buffer);
+                        if (strncmp(buffer, "+Ok. Empiez", 11) == 0)
+                            break;
+                    }
+                }
+            }
         }
     }
 
