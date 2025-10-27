@@ -9,7 +9,6 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <time.h>
-
 int main()
 {
     int server_socket, new_socket, client_sockets[MAX_CLIENTS] = {0};
@@ -117,35 +116,41 @@ int main()
                     switch (checkOption(command, client_sockets[i]))
                     {
                     case 1: // USUARIO
-                        if (readUser(parameter, client_sockets[i]))
-                        {
+                        if(checkClientUser(parameter)){
+                            char msg []="-Err. Usuario ya conectado";
+                            send(client_sockets[i], msg, strlen(msg),0);
+                            printClients();
+                            break;
+                        }if (readUser(parameter, client_sockets[i])){
                             writeUser(client_sockets[i], parameter);
                             char msg[] = "Usuario correcto, introduce la contraseña\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
-                        }
-                        else
+                            printClients();
+                            break;
+                        }else
                         {
                             char msg[] = "Usuario incorrecto.\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
+                            printClients();
+                            break;
                         }
-                        printClients();
-                        break;
+
 
                     case 2: // PASSWORD
                         if (addPassword(client_sockets[i], parameter))
                         {
-                            char msg[] = "Contrasña correcta, ha iniciado sesión\n\n\n\n\n";
+                            char msg[] = "Contraseña correcta, ha iniciado sesión\n\n\n\n\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
                         }
                         else
                         {
-                            char msg[] = "Contrasña incorrecta y usuario no coinciden\n";
+                            char msg[] = "Contraseña incorrecta y usuario no coinciden\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
                         }
                         printClients();
                         break;
 
-                    case 3: // REGISTRO
+                    case 3: // REGISTRO 
                         char option1[50];
                         char option2[50];
 
@@ -176,8 +181,7 @@ int main()
                     {
                         switch (addPlayerToGame(client_sockets[i]))
                         {
-                        case 0:
-                        {
+                        case 0:{
                             char msg[] = "Ha ocurrido un error de emparejamiento\n";
                             send(client_sockets[i], msg, strlen(msg), 0);
                             break;
@@ -194,8 +198,26 @@ int main()
                             break;
                         }
                         }
+                        break;
                     }
-                    break;
+                    case 5: // TIRAR-DADOS
+                    {
+                        int resultado = procesarTirada(client_sockets[i], buffer);
+                        if (resultado == -1)
+                            printf("Error al procesar la tirada (jugador %d)\n", client_sockets[i]);
+                        break;
+                    }
+
+                    case 6: // NO-TIRAR-DADOS
+                        procesarNoTirar(client_sockets[i]);
+                        break;
+                    case 7: // PLANTARME
+                        procesarPlantarme(client_sockets[i]);
+                        break;
+                    case 8: // SALIR
+                        procesarSalida(client_sockets[i]);
+                        break;
+
                     default:
                         printf("Opción no reconocida: %s\n", buffer);
                         char msg[] = "Comando no reconocido.\n";

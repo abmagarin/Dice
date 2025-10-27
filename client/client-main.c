@@ -37,12 +37,12 @@ int main()
 
     while (1)
     {
-        printf("Introduce un mensaje ('SALIR' para terminar): ");
+        printf("Opciones: \n USUARIO [usuario] \n PASSWORD [contraseña] \n REGISTRO  -u [usuario] -p [contraseña] \n INCIAR-PARTIDA\n TIRAR-DADOS [numero de dados (1/2)]\n NO-TIRAR-DADOS \n PLANTARME \n SALIR \n");
         fgets(message, sizeof(message), stdin);
 
-        if (strncmp(message, "SALIR", 5) == 0)
-            break;
-
+        if (strncmp(message, "SALIR", 5) == 0){
+        send(sock, message, strlen(message), 0);
+        break;}
         send(sock, message, strlen(message), 0);
 
         int bytes_received = recv(sock, buffer, sizeof(buffer) - 1, 0);

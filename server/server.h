@@ -24,10 +24,13 @@ struct User
 
 struct Partida
 {
-    int id; // 0 vacia, 1 en espera, 2 en juego
-    int estado;
+    int id;
+    int estado;             
     int jugadores[2];
     int puntuaciones[2];
+    int noTirar[2];
+    int plantado[2];
+    int turno;              
     int puntuacionMax;
 };
 
@@ -67,4 +70,12 @@ int addPlayerToGame(int playerSocket);
 
 int numeroAleatorio(int min, int max);
 
+int procesarTirada(int socket, char *buffer);
+int procesarNoTirar(int socket);
+int procesarPlantarme(int socket);
+void procesarSalida(int socket);
+
+int getPartidaDeJugador(int socket);
+int getIndiceJugador(struct Partida *p, int socket);
+void finalizarPartida(struct Partida *p, const char *mensajeFinal);
 #endif
