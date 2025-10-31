@@ -37,10 +37,22 @@ int checkOption(char *command, int descriptor)
     {
         return 4;
     }
-    else if((strcmp(command, "TIRAR-DADOS")==0)&& (checkClientRegistered(descriptor)==1)){return 5;}
-    else if((strcmp(command, "NO-TIRAR-DADOS")==0)&& (checkClientRegistered(descriptor)==1)){return 6;}
-    else if((strcmp(command, "PLANTARME")==0)&& (checkClientRegistered(descriptor)==1)){return 7;}
-    else if((strcmp(command, "SALIR")==0)&& (checkClientRegistered(descriptor)==1)){return 8;}
+    else if ((strcmp(command, "TD") == 0) && (checkClientRegistered(descriptor) == 1))
+    {
+        return 5;
+    }
+    else if ((strcmp(command, "NO-TIRAR-DADOS") == 0) && (checkClientRegistered(descriptor) == 1))
+    {
+        return 6;
+    }
+    else if ((strcmp(command, "PLANTARME") == 0) && (checkClientRegistered(descriptor) == 1))
+    {
+        return 7;
+    }
+    else if ((strcmp(command, "SALIR") == 0) && (checkClientRegistered(descriptor) == 1))
+    {
+        return 8;
+    }
     else
     {
         return -1;
@@ -106,13 +118,38 @@ int registerClient(int socket)
     return 0;
 }
 
+// Recorre todas las partidas para saber donde está el jugador que ha actuado para guardar los datos
+int getIdPartidaDeJugador(int socket)
+{
+    for (int i = 0; i < MAX_PARTIDAS; i++)
+    {
+        if (partidas[i].jugadores[0] == socket || partidas[i].jugadores[1] == socket)
+            return i;
+    }
+    return -1;
+}
+
+void resetPartida(struct Partida *p)
+{
+    p->estado = 0;
+    p->jugadores[0] = 0;
+    p->jugadores[1] = 0;
+    p->puntuaciones[0] = 0;
+    p->puntuaciones[1] = 0;
+    p->plantado[0] = 0;
+    p->plantado[1] = 0;
+    p->turno = 0;
+    p->puntuacionMax = 0;
+}
+
 // Borra al cliente de la lista
 
 int unregisterClient(int socket)
 {
-    
-    int partidaIndex = getPartidaDeJugador(socket);
-    if (partidaIndex != -1){
+
+    int partidaIndex = getIdPartidaDeJugador(socket);
+    if (partidaIndex != -1)
+    {
         struct Partida *p = &partidas[partidaIndex];
         int jugador = getIndiceJugador(p, socket);
         int rival = 1 - jugador;
@@ -120,27 +157,24 @@ int unregisterClient(int socket)
         printf("[DEBUG] Cliente con socket %d abandonó la partida %d\n", socket, partidaIndex);
 
         // Si la partida sigue activa, avisar al rival
-        if (p->estado == 2 && p->jugadores[rival] != 0){
+        if (p->estado == 2 && p->jugadores[rival] != 0)
+        {
             char msg[120];
             sprintf(msg, "+Ok. Tu oponente se ha desconectado. Has ganado.\n");
             send(p->jugadores[rival], msg, strlen(msg), 0);
         }
 
         // Limpiar estructura de partida
-        p->estado = 3;  // marcada como finalizada
-        p->jugadores[0] = 0;
-        p->jugadores[1] = 0;
-        p->puntuaciones[0] = p->puntuaciones[1] = 0;
-        p->plantado[0] = p->plantado[1] = 0;
-        p->turno = 0;
-        p->puntuacionMax = 0;
+        resetPartida(p);
 
         printf("[DEBUG] Partida %d finalizada por desconexión.\n", partidaIndex);
     }
 
-    //quitarlo de la lista
-    for (int i = 0; i < MAX_CLIENTS; i++){
-        if (clients[i].socket == socket){
+    // quitarlo de la lista
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients[i].socket == socket)
+        {
             clients[i].socket = 0;
             clients[i].registered = 0;
             strcpy(clients[i].usuario, "");
@@ -152,7 +186,6 @@ int unregisterClient(int socket)
     printf("[DEBUG] No se encontró el cliente con socket %d.\n", socket);
     return 0;
 }
-
 
 // Asigna el nombre user con el socket
 int writeUser(int socket, char *user)
@@ -245,6 +278,13 @@ int checkClientRegistered(int socket)
 
 int addPlayerToGame(int playerSocket)
 {
+    int oldMatch = getIdPartidaDeJugador(playerSocket);
+    if (oldMatch != -1)
+    {
+        printf("[DEBUG] Jugador %d aún estaba en la partida %d. Limpiando...\n", playerSocket, oldMatch);
+        resetPartida(&partidas[oldMatch]);
+    }
+
     for (int i = 0; i < MAX_PARTIDAS; i++)
     {
         if (partidas[i].estado == 0)
@@ -257,7 +297,7 @@ int addPlayerToGame(int playerSocket)
         {
             partidas[i].jugadores[1] = playerSocket;
             partidas[i].estado = 2;
-            partidas[i].puntuacionMax = numeroAleatorio(90, 175);
+            partidas[i].puntuacionMax = numeroAleatorio(20, 30);
             partidas[i].puntuaciones[0] = partidas[i].puntuaciones[1] = 0;
             partidas[i].plantado[0] = partidas[i].plantado[1] = 0;
             partidas[i].turno = 0;
@@ -279,80 +319,97 @@ int numeroAleatorio(int min, int max)
     return rand() % (max - min + 1) + min;
 }
 
-//Se encarga de cuando se tira un dado
+// Se encarga de cuando se tira un dado
 
 int procesarTirada(int socket, char *buffer)
 {
-    int partidaIndex = getPartidaDeJugador(socket);
-    if (partidaIndex == -1){
+    int partidaIndex = getIdPartidaDeJugador(socket);
+    if (partidaIndex == -1)
+    {
         send(socket, "-Err. No estás en una partida.\n", 40, 0);
         return -1;
     }
 
     struct Partida *p = &partidas[partidaIndex];
     int jugador = getIndiceJugador(p, socket);
-    if (p->plantado[jugador]==0)
+    if (p->plantado[jugador] == 0)
     {
-    if (p->estado != 2){
-        send(socket, "-Err. La partida no está activa.\n", 40, 0);
-        return -1;
+        if (p->estado != 2)
+        {
+            send(socket, "-Err. La partida no está activa.\n", 40, 0);
+            return -1;
+        }
+
+        if (p->turno != jugador)
+        {
+            send(socket, "-Err. No es tu turno.\n", 40, 0);
+            return -1;
+        }
+
+        printf("[DEBUG] Jugador %d (socket %d) tirando dados en partida %d\n", jugador, socket, partidaIndex);
+
+        int nDados = 1;
+        sscanf(buffer, "%*s %d", &nDados);
+        if (nDados < 1 || nDados > 2)
+        {
+            nDados = 1;
+        }
+
+        int dado1 = numeroAleatorio(1, 6);
+        int dado2 = 0;
+        if (nDados == 2)
+        {
+            dado2 = numeroAleatorio(1, 6);
+        }
+        int suma = dado1 + dado2;
+
+        p->puntuaciones[jugador] += suma;
+
+        char msg[200];
+        if (nDados == 1)
+        {
+            sprintf(msg, "+Ok.[<DADO1,%d>] Puntuación total: %d\n +Ok. Has terminado tu turno.\n", dado1, p->puntuaciones[jugador]);
+        }
+        else
+        {
+            sprintf(msg, "+Ok.[<DADO1,%d>,<DADO2,%d>] Puntuación total: %d\n +Ok. Has terminado tu turno.\n", dado1, dado2, p->puntuaciones[jugador]);
+        }
+
+        // Enviar el resultado de la tirada a ambos jugadores
+        send(p->jugadores[jugador], msg, strlen(msg), 0);
+
+        printf("[DEBUG] Puntuación jugador %d: %d / Objetivo: %d\n", jugador, p->puntuaciones[jugador], p->puntuacionMax);
+
+        // Si se pasa del objetivo
+        if (p->puntuaciones[jugador] > p->puntuacionMax)
+        {
+            char msgErr[100];
+            sprintf(msgErr, "-Err. Excedido el valor de %d\n", p->puntuacionMax);
+            send(p->jugadores[jugador], msgErr, strlen(msgErr), 0);
+            finalizarPartida(p, "+Ok. Tu oponente se ha pasado. Has ganado.\n");
+            printf("[DEBUG] Partida %d finalizada: jugador %d se pasó del límite\n", partidaIndex, jugador);
+            return 1;
+        }
+
+        // Cambiar turno
     }
-
-    if (p->turno != jugador){
-        send(socket, "-Err. No es tu turno.\n", 40, 0);
-        return -1;
-    }
-
-    printf("[DEBUG] Jugador %d (socket %d) tirando dados en partida %d\n", jugador, socket, partidaIndex);
-
-    int nDados = 1;
-    sscanf(buffer, "%*s %d", &nDados);
-    if (nDados < 1 || nDados > 2) {nDados = 1;}
-
-    int dado1 = numeroAleatorio(1, 6);
-    int dado2 =0;
-    if(nDados == 2){dado2=numeroAleatorio(1, 6);}
-    int suma = dado1 + dado2;
-
-    p->puntuaciones[jugador] += suma;
-
-    char msg[200];
-    if (nDados == 1){
-    sprintf(msg, "+Ok.[<DADO1,%d>] Puntuación total: %d\n +Ok. Has terminado tu turno.\n", dado1, p->puntuaciones[jugador]);}
-    else{sprintf(msg, "+Ok.[<DADO1,%d>,<DADO2,%d>] Puntuación total: %d\n +Ok. Has terminado tu turno.\n", dado1, dado2, p->puntuaciones[jugador]);}
-
-    // Enviar el resultado de la tirada a ambos jugadores
-    send(p->jugadores[jugador], msg, strlen(msg), 0);
-
-    printf("[DEBUG] Puntuación jugador %d: %d / Objetivo: %d\n",jugador, p->puntuaciones[jugador], p->puntuacionMax);
-
-    // Si se pasa del objetivo
-    if (p->puntuaciones[jugador] > p->puntuacionMax){
-        char msgErr[100];
-        sprintf(msgErr, "-Err. Excedido el valor de %d\n", p->puntuacionMax);
-        send(p->jugadores[jugador], msgErr, strlen(msgErr), 0);
-        finalizarPartida(p, "+Ok. Tu oponente se ha pasado. Has ganado.\n");
-        printf("[DEBUG] Partida %d finalizada: jugador %d se pasó del límite\n", partidaIndex, jugador);
-        return 1;
-    }
-
-    //Cambiar turno
-}
-    if (p->plantado[jugador]==1){
+    if (p->plantado[jugador] == 1)
+    {
         char msgPL[100];
         sprintf(msgPL, "-Err. Te habías plantado \n");
         send(p->jugadores[jugador], msgPL, strlen(msgPL), 0);
     }
     p->turno = 1 - jugador;
-    
-    printf("Turno cambiado. Ahora juega jugador %d (socket %d)\n",p->turno, p->jugadores[p->turno]);
+
+    printf("Turno cambiado. Ahora juega jugador %d (socket %d)\n", p->turno, p->jugadores[p->turno]);
     return 0;
 }
 
 int procesarNoTirar(int socket)
 {
-    int partidaIndex = getPartidaDeJugador(socket);
-    if (partidaIndex == -1) {
+    int partidaIndex = getIdPartidaDeJugador(socket);
+    if (partidaIndex == -1)
+    {
         send(socket, "-Err. No estás en una partida.\n", 40, 0);
         return -1;
     }
@@ -360,7 +417,8 @@ int procesarNoTirar(int socket)
     struct Partida *p = &partidas[partidaIndex];
     int jugador = getIndiceJugador(p, socket);
 
-    if (p->turno != jugador) {
+    if (p->turno != jugador)
+    {
         send(socket, "-Err. No es tu turno.\n", 40, 0);
         return -1;
     }
@@ -377,10 +435,9 @@ int procesarNoTirar(int socket)
     return 0;
 }
 
-
 int procesarPlantarme(int socket)
 {
-    int partidaIndex = getPartidaDeJugador(socket);
+    int partidaIndex = getIdPartidaDeJugador(socket);
     if (partidaIndex == -1)
     {
         send(socket, "-Err. No estás en una partida.\n", 40, 0);
@@ -396,13 +453,18 @@ int procesarPlantarme(int socket)
     // Si ambos se plantaron → finalizar partida
     if (p->plantado[0] && p->plantado[1])
     {
-        if (p->puntuaciones[0] > p->puntuaciones[1]){
+        if (p->puntuaciones[0] > p->puntuaciones[1])
+        {
             finalizarPartida(p, "+Ok. Partida finalizada. Jugador 1 gana.\n");
         }
-        else if (p->puntuaciones[1] > p->puntuaciones[0]){
+        else if (p->puntuaciones[1] > p->puntuaciones[0])
+        {
             finalizarPartida(p, "+Ok. Partida finalizada. Jugador 2 gana.\n");
         }
-            else{finalizarPartida(p, "+Ok. Empate.\n");}
+        else
+        {
+            finalizarPartida(p, "+Ok. Empate.\n");
+        }
         return 1;
     }
 
@@ -413,8 +475,9 @@ int procesarPlantarme(int socket)
 
 void procesarSalida(int socket)
 {
-    int partidaIndex = getPartidaDeJugador(socket);
-    if (partidaIndex == -1) return;
+    int partidaIndex = getIdPartidaDeJugador(socket);
+    if (partidaIndex == -1)
+        return;
 
     struct Partida *p = &partidas[partidaIndex];
     int jugador = getIndiceJugador(p, socket);
@@ -423,36 +486,21 @@ void procesarSalida(int socket)
     send(socket, "+Ok. Has salido de la partida.\n", 40, 0);
     send(p->jugadores[otro], "+Ok. Tu oponente ha abandonado. Ganas la partida.\n", 60, 0);
 
-    p->estado = 3;
+    resetPartida(p);
 }
 
-//Recorre todas las partidas para saber donde está el jugador que ha actuado para guardar los datos
-int getPartidaDeJugador(int socket)
-{
-    for (int i = 0; i < MAX_PARTIDAS; i++)
-    {
-        if (partidas[i].estado == 2)
-        {
-            if (partidas[i].jugadores[0] == socket || partidas[i].jugadores[1] == socket)
-                return i;
-        }
-    }
-    return -1;
-}
-
-//devuelve el en cual de las dos posciones está el jugador
+// devuelve el en cual de las dos posciones está el jugador
 int getIndiceJugador(struct Partida *p, int socket)
 {
     return (p->jugadores[0] == socket) ? 0 : 1;
 }
 
-//Avisa a los jugadores de que la partida ha terminado ya sea por abandono o por derrota o vicoria del otro
+// Avisa a los jugadores de que la partida ha terminado ya sea por abandono o por derrota o vicoria del otro
 void finalizarPartida(struct Partida *p, const char *mensajeFinal)
 {
-    if (p->estado == 3) return;
     for (int i = 0; i < 2; i++)
     {
         send(p->jugadores[i], mensajeFinal, strlen(mensajeFinal), 0);
     }
-    p->estado = 3;
+    resetPartida(p);
 }
