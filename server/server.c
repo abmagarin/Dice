@@ -410,7 +410,6 @@ int procesarTirada(int socket, char *buffer)
     return 0;
 }
 
-{
 int procesarNoTirar(int socket){
     int partidaIndex = getIdPartidaDeJugador(socket);
     if (partidaIndex == -1){
