@@ -37,7 +37,7 @@ int checkOption(char *command, int descriptor)
     {
         return 4;
     }
-    else if ((strcmp(command, "TD") == 0) && (checkClientRegistered(descriptor) == 1))
+    else if ((strcmp(command, "TIRAR-DADOS") == 0) && (checkClientRegistered(descriptor) == 1))
     {
         return 5;
     }
@@ -123,8 +123,8 @@ int getIdPartidaDeJugador(int socket)
 {
     for (int i = 0; i < MAX_PARTIDAS; i++)
     {
-        if (partidas[i].jugadores[0] == socket || partidas[i].jugadores[1] == socket)
-            return i;
+        if (partidas[i].estado != 2){continue;}
+        if (partidas[i].jugadores[0] == socket || partidas[i].jugadores[1] == socket){return i;}
     }
     return -1;
 }
@@ -214,7 +214,7 @@ int findUser(char *usuario, char *password)
             return 1;
         }
     }
-    return 0;
+    return 0;   
 }
 
 // Añade la contraseña al cliente y cambia su estado a online
@@ -364,20 +364,18 @@ int procesarTirada(int socket, char *buffer)
         int suma = dado1 + dado2;
 
         p->puntuaciones[jugador] += suma;
-
+        if(p->puntuaciones[jugador]<=p->puntuacionMax){
         char msg[200];
-        if (nDados == 1)
-        {
+        if (nDados == 1){
             sprintf(msg, "+Ok.[<DADO1,%d>] Puntuación total: %d\n +Ok. Has terminado tu turno.\n", dado1, p->puntuaciones[jugador]);
         }
-        else
-        {
+        else{
             sprintf(msg, "+Ok.[<DADO1,%d>,<DADO2,%d>] Puntuación total: %d\n +Ok. Has terminado tu turno.\n", dado1, dado2, p->puntuaciones[jugador]);
         }
-
+    
         // Enviar el resultado de la tirada a ambos jugadores
         send(p->jugadores[jugador], msg, strlen(msg), 0);
-
+    }
         printf("[DEBUG] Puntuación jugador %d: %d / Objetivo: %d\n", jugador, p->puntuaciones[jugador], p->puntuacionMax);
 
         // Si se pasa del objetivo
@@ -386,9 +384,16 @@ int procesarTirada(int socket, char *buffer)
             char msgErr[100];
             sprintf(msgErr, "-Err. Excedido el valor de %d\n", p->puntuacionMax);
             send(p->jugadores[jugador], msgErr, strlen(msgErr), 0);
-            finalizarPartida(p, "+Ok. Tu oponente se ha pasado. Has ganado.\n");
+            char msgV[100];
+            sprintf(msgV, "+Ok. Tu oponente se ha pasado. Has ganado \n");
+            for (int i = 0; i < 2; i++){
+                if(i!=jugador){
+                send(p->jugadores[i], msgV, strlen(msgV), 0);
+            }}
+
+            resetPartida(p);
             printf("[DEBUG] Partida %d finalizada: jugador %d se pasó del límite\n", partidaIndex, jugador);
-            return 1;
+            return 0;
         }
 
         // Cambiar turno
@@ -405,11 +410,10 @@ int procesarTirada(int socket, char *buffer)
     return 0;
 }
 
-int procesarNoTirar(int socket)
 {
+int procesarNoTirar(int socket){
     int partidaIndex = getIdPartidaDeJugador(socket);
-    if (partidaIndex == -1)
-    {
+    if (partidaIndex == -1){
         send(socket, "-Err. No estás en una partida.\n", 40, 0);
         return -1;
     }
@@ -417,8 +421,8 @@ int procesarNoTirar(int socket)
     struct Partida *p = &partidas[partidaIndex];
     int jugador = getIndiceJugador(p, socket);
 
-    if (p->turno != jugador)
-    {
+    if (p->plantado[jugador] == 0){
+    if (p->turno != jugador){
         send(socket, "-Err. No es tu turno.\n", 40, 0);
         return -1;
     }
@@ -431,8 +435,15 @@ int procesarNoTirar(int socket)
     send(p->jugadores[jugador], msg, strlen(msg), 0);
     // Cambiar turno
 
-    p->turno = 1 - jugador;
+   }
+    if (p->plantado[jugador] == 1){
+    char msgPL[512];
+    sprintf(msgPL, "-Ok. Decides no tirar los dados para pasar el turno porque ya te habías plantado \n");
+    send(p->jugadores[jugador], msgPL, strlen(msgPL), 0);
+    }
+        p->turno = 1 - jugador;
     return 0;
+ 
 }
 
 int procesarPlantarme(int socket)
@@ -453,16 +464,13 @@ int procesarPlantarme(int socket)
     // Si ambos se plantaron → finalizar partida
     if (p->plantado[0] && p->plantado[1])
     {
-        if (p->puntuaciones[0] > p->puntuaciones[1])
-        {
+        if (p->puntuaciones[0] > p->puntuaciones[1]){
             finalizarPartida(p, "+Ok. Partida finalizada. Jugador 1 gana.\n");
         }
-        else if (p->puntuaciones[1] > p->puntuaciones[0])
-        {
+        else if (p->puntuaciones[1] > p->puntuaciones[0]){
             finalizarPartida(p, "+Ok. Partida finalizada. Jugador 2 gana.\n");
         }
-        else
-        {
+        else{
             finalizarPartida(p, "+Ok. Empate.\n");
         }
         return 1;
